@@ -1,0 +1,556 @@
+{
+    "info": {
+        "_postman_id": "d8f3b4c2-9a1e-4f7b-8c3d-1e6a9b2c5d8f",
+        "name": "Products Service - Cloud Native API",
+        "description": "Collection de tests pour le microservice Products\n\nCe microservice gère les produits avec les opérations CRUD complètes.\n\n**Endpoints:**\n- GET /products - Lister tous les produits (avec filtres)\n- GET /products/:id - Consulter un produit\n- GET /products/category/:category - Lister par catégorie\n- POST /products - Créer un produit\n- PUT /products/:id - Mettre à jour un produit\n- DELETE /products/:id - Supprimer un produit\n- GET /health - Health check\n- GET /metrics - Métriques Prometheus",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Health & Info",
+            "item": [
+                {
+                    "name": "API Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                ""
+                            ]
+                        },
+                        "description": "Obtenir les informations sur l'API et la liste des endpoints disponibles"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Health Check",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/health",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "health"
+                            ]
+                        },
+                        "description": "Vérifier l'état du service et la connexion à la base de données"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Prometheus Metrics",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/metrics",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "metrics"
+                            ]
+                        },
+                        "description": "Récupérer les métriques Prometheus du service"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Endpoints de monitoring et d'information"
+        },
+        {
+            "name": "Products - GET",
+            "item": [
+                {
+                    "name": "Get All Products",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "Récupérer la liste de tous les produits"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Products by Category",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products?category=Informatique",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ],
+                            "query": [
+                                {
+                                    "key": "category",
+                                    "value": "Informatique"
+                                }
+                            ]
+                        },
+                        "description": "Filtrer les produits par catégorie"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Products by Price Range",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products?minPrice=100&maxPrice=500",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ],
+                            "query": [
+                                {
+                                    "key": "minPrice",
+                                    "value": "100"
+                                },
+                                {
+                                    "key": "maxPrice",
+                                    "value": "500"
+                                }
+                            ]
+                        },
+                        "description": "Filtrer les produits par fourchette de prix"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Products In Stock Only",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products?inStock=true",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ],
+                            "query": [
+                                {
+                                    "key": "inStock",
+                                    "value": "true"
+                                }
+                            ]
+                        },
+                        "description": "Récupérer uniquement les produits en stock"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Product by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products/1",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "1"
+                            ]
+                        },
+                        "description": "Récupérer un produit spécifique par son ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Products by Category Route",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products/category/Téléphonie",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "category",
+                                "Téléphonie"
+                            ]
+                        },
+                        "description": "Récupérer tous les produits d'une catégorie spécifique via la route dédiée"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Opérations de lecture (GET) sur les produits"
+        },
+        {
+            "name": "Products - POST",
+            "item": [
+                {
+                    "name": "Create Product - Complete",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Nintendo Switch OLED\",\n    \"description\": \"Console de jeu portable et de salon avec écran OLED 7 pouces\",\n    \"price\": 349.99,\n    \"stock\": 25,\n    \"category\": \"Gaming\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "Créer un produit avec toutes les informations"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Product - Minimal",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Produit Test\",\n    \"price\": 99.99\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "Créer un produit avec les champs minimaux requis (name et price)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Product - Invalid (No Price)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Produit sans prix\",\n    \"description\": \"Ce produit devrait échouer\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "Test de validation - devrait retourner une erreur 400"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Product - Invalid (Negative Price)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Produit prix négatif\",\n    \"price\": -50.00\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "Test de validation - le prix ne peut pas être négatif"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Opérations de création (POST) de produits"
+        },
+        {
+            "name": "Products - PUT",
+            "item": [
+                {
+                    "name": "Update Product - Full",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Laptop Dell XPS 15 - Edition 2024\",\n    \"description\": \"Ordinateur portable haute performance, processeur Intel i9, 32GB RAM\",\n    \"price\": 1499.99,\n    \"stock\": 20,\n    \"category\": \"Informatique\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products/1",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "1"
+                            ]
+                        },
+                        "description": "Mettre à jour tous les champs d'un produit"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Product - Price Only",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"price\": 1099.00\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products/2",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "2"
+                            ]
+                        },
+                        "description": "Mettre à jour uniquement le prix d'un produit"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Product - Stock Only",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"stock\": 100\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products/3",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "3"
+                            ]
+                        },
+                        "description": "Mettre à jour uniquement le stock d'un produit"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Product - Not Found",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"price\": 999.99\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:3002/products/9999",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "9999"
+                            ]
+                        },
+                        "description": "Test avec un ID inexistant - devrait retourner 404"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Opérations de mise à jour (PUT) de produits"
+        },
+        {
+            "name": "Products - DELETE",
+            "item": [
+                {
+                    "name": "Delete Product",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products/10",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "10"
+                            ]
+                        },
+                        "description": "Supprimer un produit par son ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Product - Not Found",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/products/9999",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "products",
+                                "9999"
+                            ]
+                        },
+                        "description": "Test de suppression d'un produit inexistant - devrait retourner 404"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Opérations de suppression (DELETE) de produits"
+        },
+        {
+            "name": "Error Cases",
+            "item": [
+                {
+                    "name": "404 - Route Not Found",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:3002/invalid-route",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "3002",
+                            "path": [
+                                "invalid-route"
+                            ]
+                        },
+                        "description": "Tester une route qui n'existe pas"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Tests des cas d'erreur"
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:3002",
+            "type": "string"
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+# Ignore fichiers et dossiers Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Ignore CLI configuration
+.terraformrc
+
+# Ignore secrets
+secrets.auto.tfvars

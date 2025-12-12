@@ -1,11 +1,139 @@
+// Charger les variables d'environnement EN PREMIER
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const promClient = require('prom-client');
+const redis = require('redis');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const { body, validationResult, param } = require('express-validator');
 
 // Configuration de l'application Express
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ==================== SÉCURITÉ - HELMET ====================
+
+// Helmet ajoute des headers de sécurité HTTP
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"]
+    }
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// ==================== SÉCURITÉ - RATE LIMITING ====================
+
+// Limiter le nombre de requêtes pour prévenir les attaques par force brute
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // 100 requêtes max
+  message: {
+    success: false,
+    error: 'Trop de requêtes depuis cette IP, veuillez réessayer dans 1 minute'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Appliquer le rate limiter sur toutes les routes
+app.use(limiter);
+
+// Rate limiter plus strict pour les routes sensibles (authentification)
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 tentatives max
+  message: {
+    success: false,
+    error: 'Trop de tentatives. Compte temporairement verrouillé. Réessayez dans 15 minutes.'
+  }
+});
+
+// ==================== SÉCURITÉ - CORS RESTRICTIF ====================
+
+// Configuration CORS sécurisée
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Liste des origines autorisées (depuis .env)
+    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
+
+    // Autoriser les requêtes sans origin (comme Postman) en développement
+    if (!origin && process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Non autorisé par CORS'));
+    }
+  },
+  methods: (process.env.CORS_ALLOWED_METHODS || 'GET,POST,PUT,DELETE').split(','),
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With'
+  ],
+  credentials: true,
+  maxAge: 86400 // 24 heures
+};
+
+app.use(cors(corsOptions));
+
+// Middleware pour parser le JSON (avec limite de taille)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ==================== SÉCURITÉ - MIDDLEWARE DE LOGS ====================
+
+// Middleware de logging des requêtes (sécurité & audit)
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const method = req.method;
+  const url = req.url;
+  const userAgent = req.headers['user-agent'];
+
+  // Log toutes les requêtes entrantes
+  console.log(`[${timestamp}] ${method} ${url} - IP: ${ip} - User-Agent: ${userAgent}`);
+
+  // Log les tentatives de requêtes suspectes
+  if (url.includes('..') || url.includes('<script>') || url.includes('SELECT')) {
+    console.warn(`⚠️  [SECURITY] Requête suspecte détectée - IP: ${ip} - URL: ${url}`);
+  }
+
+  next();
+});
+
+// ==================== REDIS CLIENT ====================
+
+// Configuration du client Redis
+const redisClient = redis.createClient({
+  socket: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379
+  }
+});
+
+// Connexion à Redis
+redisClient.connect().catch(console.error);
+
+redisClient.on('connect', () => {
+  console.log('✅ Connexion à Redis réussie!');
+});
+
+redisClient.on('error', (err) => {
+  console.error('❌ Erreur Redis:', err);
+});
 
 // ==================== PROMETHEUS METRICS ====================
 
@@ -48,6 +176,19 @@ const userOperationsCounter = new promClient.Counter({
   name: 'user_operations_total',
   help: 'Total des opérations sur les utilisateurs',
   labelNames: ['operation']
+});
+
+// Compteur de cache hits/misses
+const cacheHitsCounter = new promClient.Counter({
+  name: 'cache_hits_total',
+  help: 'Total des cache hits',
+  labelNames: ['cache_type']
+});
+
+const cacheMissesCounter = new promClient.Counter({
+  name: 'cache_misses_total',
+  help: 'Total des cache misses',
+  labelNames: ['cache_type']
 });
 
 // Middleware de collecte des métriques
@@ -126,6 +267,8 @@ app.get('/', (req, res) => {
   res.json({
     message: '🚀 API Users - Microservice Cloud-Native',
     version: '1.0.0',
+    instance: process.env.INSTANCE_ID || 'unknown',
+    hostname: require('os').hostname(),
     endpoints: {
       'GET /users': 'Lister tous les utilisateurs',
       'GET /users/:id': 'Consulter un utilisateur par ID',
@@ -141,18 +284,58 @@ app.get('/', (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'healthy', database: 'connected' });
+    res.json({
+      status: 'healthy',
+      database: 'connected',
+      instance: process.env.INSTANCE_ID || 'unknown',
+      hostname: require('os').hostname()
+    });
   } catch (error) {
-    res.status(500).json({ status: 'unhealthy', database: 'disconnected', error: error.message });
+    res.status(500).json({
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: error.message,
+      instance: process.env.INSTANCE_ID || 'unknown',
+      hostname: require('os').hostname()
+    });
   }
 });
 
-// 1. GET /users - Lister tous les utilisateurs
+// 1. GET /users - Lister tous les utilisateurs (AVEC CACHE REDIS)
 app.get('/users', async (req, res) => {
+  const cacheKey = 'users:all';
+
   try {
+    // 1. Essayer de récupérer depuis le cache
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      // CACHE HIT - Données trouvées dans Redis
+      console.log('✅ Cache HIT pour /users');
+      cacheHitsCounter.inc({ cache_type: 'users_list' });
+
+      const parsedData = JSON.parse(cachedData);
+
+      return res.json({
+        success: true,
+        count: parsedData.length,
+        data: parsedData,
+        cached: true,
+        instance: process.env.INSTANCE_ID || 'unknown'
+      });
+    }
+
+    // CACHE MISS - Données non trouvées, interroger la base de données
+    console.log('❌ Cache MISS pour /users - Interrogation de la DB');
+    cacheMissesCounter.inc({ cache_type: 'users_list' });
+
     const result = await pool.query(
       'SELECT id, name, email, created_at FROM users ORDER BY id ASC'
     );
+
+    // Stocker dans Redis avec TTL de 60 secondes
+    await redisClient.setEx(cacheKey, 60, JSON.stringify(result.rows));
+    console.log('💾 Données stockées dans Redis (TTL: 60s)');
 
     // Incrémenter le compteur d'opérations
     userOperationsCounter.inc({ operation: 'list' });
@@ -160,7 +343,9 @@ app.get('/users', async (req, res) => {
     res.json({
       success: true,
       count: result.rows.length,
-      data: result.rows
+      data: result.rows,
+      cached: false,
+      instance: process.env.INSTANCE_ID || 'unknown'
     });
   } catch (error) {
     console.error('Erreur lors de la récupération des utilisateurs:', error);
@@ -199,63 +384,34 @@ app.get('/users/:id', async (req, res) => {
     console.error('Erreur lors de la récupération de l\'utilisateur:', error);
     res.status(500).json({
       success: false,
-      error: 'Erreur serveur lors de la récupération de l\'utilisateur'
-    });
-  }
-});
+      await redisClient.del('users:all');
+      console.log('🗑️  Cache invalidé après création d\'utilisateur');
 
-// 3. POST /users - Ajouter un nouvel utilisateur
-app.post('/users', async (req, res) => {
-  const { name, email } = req.body;
+      // Incrémenter le compteur d'opérations
+      userOperationsCounter.inc({ operation: 'create' });
 
-  // Validation des données
-  if (!name || !email) {
-    return res.status(400).json({
-      success: false,
-      error: 'Les champs "name" et "email" sont requis'
-    });
-  }
+      res.status(201).json({
+        success: true,
+        message: 'Utilisateur créé avec succès',
+        data: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Erreur lors de la création de l\'utilisateur:', error);
 
-  // Validation basique de l'email
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Format d\'email invalide'
-    });
-  }
+      // Gestion de l'erreur de contrainte unique (email déjà existant)
+      if (error.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          error: 'Cet email est déjà utilisé'
+        });
+      }
 
-  try {
-    const result = await pool.query(
-      'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email, created_at',
-      [name, email]
-    );
-
-    // Incrémenter le compteur d'opérations
-    userOperationsCounter.inc({ operation: 'create' });
-
-    res.status(201).json({
-      success: true,
-      message: 'Utilisateur créé avec succès',
-      data: result.rows[0]
-    });
-  } catch (error) {
-    console.error('Erreur lors de la création de l\'utilisateur:', error);
-
-    // Gestion de l'erreur de contrainte unique (email déjà existant)
-    if (error.code === '23505') {
-      return res.status(409).json({
+      res.status(500).json({
         success: false,
-        error: 'Cet email est déjà utilisé'
+        error: 'Erreur serveur lors de la création de l\'utilisateur'
       });
     }
-
-    res.status(500).json({
-      success: false,
-      error: 'Erreur serveur lors de la création de l\'utilisateur'
-    });
-  }
-});
+  });
 
 // 4. DELETE /users/:id - Supprimer un utilisateur
 app.delete('/users/:id', async (req, res) => {
@@ -273,6 +429,10 @@ app.delete('/users/:id', async (req, res) => {
         error: `Utilisateur avec l'ID ${id} non trouvé`
       });
     }
+
+    // Invalider le cache car la liste des utilisateurs a changé
+    await redisClient.del('users:all');
+    console.log('🗑️  Cache invalidé après suppression d\'utilisateur');
 
     // Incrémenter le compteur d'opérations
     userOperationsCounter.inc({ operation: 'delete' });

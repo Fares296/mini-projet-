@@ -1,0 +1,242 @@
+version: '3.8'
+
+services:
+  # ==================== BASE DE DONNÉES USERS ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: users-postgres
+    environment:
+      POSTGRES_DB: usersdb
+      POSTGRES_USER: clouduser
+      POSTGRES_PASSWORD: cloudpass123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - cloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clouduser -d usersdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== BASE DE DONNÉES PRODUCTS ====================
+  postgres-products:
+    image: postgres:15-alpine
+    container_name: products-postgres
+    environment:
+      POSTGRES_DB: productsdb
+      POSTGRES_USER: clouduser
+      POSTGRES_PASSWORD: cloudpass123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_products_data:/var/lib/postgresql/data
+      - ./products-service/init-products.sql:/docker-entrypoint-initdb.d/init-products.sql
+    networks:
+      - cloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clouduser -d productsdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== MICROSERVICE USERS (Scaled x3) ====================
+  users-service-1:
+    build: .
+    container_name: users-service-1
+    hostname: users-service-1
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: clouduser
+      DB_PASSWORD: cloudpass123
+      DB_NAME: usersdb
+      INSTANCE_ID: "1"  # Pour identifier l'instance
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  users-service-2:
+    build: .
+    container_name: users-service-2
+    hostname: users-service-2
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: clouduser
+      DB_PASSWORD: cloudpass123
+      DB_NAME: usersdb
+      INSTANCE_ID: "2"  # Pour identifier l'instance
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "3004:3000"  # Changé de 3001 à 3004 (3001 utilisé par Grafana)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  users-service-3:
+    build: .
+    container_name: users-service-3
+    hostname: users-service-3
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: clouduser
+      DB_PASSWORD: cloudpass123
+      DB_NAME: usersdb
+      INSTANCE_ID: "3"  # Pour identifier l'instance
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "3003:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  # ==================== MICROSERVICE PRODUCTS ====================
+  products-service:
+    build: ./products-service
+    container_name: products-service
+    environment:
+      PORT: 3001
+      DB_HOST: postgres-products
+      DB_PORT: 5432
+      DB_USER: clouduser
+      DB_PASSWORD: cloudpass123
+      DB_NAME: productsdb
+    ports:
+      - "3002:3001"
+    depends_on:
+      postgres-products:
+        condition: service_healthy
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  # ==================== API GATEWAY (NGINX) ====================
+  api-gateway:
+    image: nginx:alpine
+    container_name: api-gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - users-service-1
+      - users-service-2
+      - users-service-3
+      - products-service
+      - prometheus
+    networks:
+      - cloud-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==================== REDIS CACHE ====================
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - cloud-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==================== PROMETHEUS ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  # ==================== GRAFANA ====================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+# ==================== VOLUMES ====================
+volumes:
+  postgres_data:
+    driver: local
+  postgres_products_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  redis_data:
+    driver: local
+
+# ==================== NETWORKS ====================
+networks:
+  cloud-network:
+    driver: bridge

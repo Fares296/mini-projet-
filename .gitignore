@@ -1,0 +1,51 @@
+# ==================== SECRETS & CREDENTIALS ====================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+credentials/
+
+# ==================== NODE ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ==================== LOGS ====================
+logs/
+*.log
+nginx_logs/
+
+# ==================== TESTING ====================
+coverage/
+.nyc_output/
+*.csv
+
+# ==================== IDE ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ==================== DOCKER ====================
+.dockerignore
+
+# ==================== TEMPORARY ====================
+tmp/
+temp/
+*.tmp
+
+# ==================== SCREENSHOTS ====================
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
+# ==================== BACKUPS ====================
+*.backup
+*.bak
