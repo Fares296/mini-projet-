@@ -384,6 +384,49 @@ app.get('/users/:id', async (req, res) => {
     console.error('Erreur lors de la récupération de l\'utilisateur:', error);
     res.status(500).json({
       success: false,
+      error: 'Erreur serveur lors de la récupération de l\'utilisateur'
+    });
+  }
+});
+
+// 3. POST /users - Ajouter un nouvel utilisateur (AVEC VALIDATION & INVALIDATION CACHE)
+app.post('/users',
+  strictLimiter, // Rate limiting strict sur la création
+  [
+    // Validation des données entrantes
+    body('name')
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Le nom doit contenir entre 2 et 100 caractères')
+      .matches(/^[a-zA-ZÀ-ÿ\s'-]+$/)
+      .withMessage('Le nom ne peut contenir que des lettres, espaces, apostrophes et tirets'),
+    body('email')
+      .trim()
+      .isEmail()
+      .withMessage('Email invalide')
+      .normalizeEmail()
+      .isLength({ max: 255 })
+      .withMessage('Email trop long')
+  ],
+  async (req, res) => {
+    // Vérifier les erreurs de validation
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { name, email } = req.body;
+
+    try {
+      const result = await pool.query(
+        'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email, created_at',
+        [name, email]
+      );
+
+      // Invalider le cache car la liste des utilisateurs a changé
       await redisClient.del('users:all');
       console.log('🗑️  Cache invalidé après création d\'utilisateur');
 
